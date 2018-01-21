@@ -1,4 +1,4 @@
-# Serverless Offline Plugin
+# Serverless Offline Python Plugin
 [![serverless](http://public.serverless.com/badges/v3.svg)](http://www.serverless.com)
 [![npm version](https://badge.fury.io/js/serverless-offline.svg)](https://badge.fury.io/js/serverless-offline)
 [![Build Status](https://travis-ci.org/dherault/serverless-offline.svg?branch=master)](https://travis-ci.org/dherault/serverless-offline)
@@ -35,14 +35,14 @@ For Serverless v1 only. See [this branch](https://github.com/dherault/serverless
 
 First, add Serverless Offline to your project:
 
-`npm install serverless-offline --save-dev`
+`npm install serverless-offline-python --save-dev`
 
 Then inside your project's `serverless.yml` file add following entry to the plugins section: `serverless-offline`. If there is no plugin section you will need to add it to the file.
 
 It should look something like this:
 ```YAML
 plugins:
-  - serverless-offline
+  - serverless-offline-python
 ```
 
 You can check wether you have successfully installed the plugin by running the serverless command line:
