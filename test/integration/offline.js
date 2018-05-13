@@ -340,4 +340,115 @@ describe('Offline', () => {
       });
     });
   });
+
+  context('does not mangle payload', () => {
+    let offLine;
+    const rawBody = `{
+\t"type": "notification_event",
+\t"app_id": "q8sn4hth",
+\t"data": {
+\t\t"type": "notification_event_data",
+\t\t\t"item": {
+\t\t\t\t"type": "ping",
+\t\t\t\t"message": "something something interzen"
+\t\t\t}
+\t\t},
+\t"links": {},
+\t"id": null,
+\t"topic": "ping",
+\t"delivery_status": null,
+\t"delivery_attempts": 1,
+\t"delivered_at": 0,
+\t"first_sent_at": 1513466985,
+\t"created_at": 1513466985,
+\t"self": null
+}`;
+
+    before(done => {
+      offLine = new OffLineBuilder(new ServerlessBuilder()).addFunctionConfig('fn2', {
+        handler: 'handler.rawJsonBody',
+        events: [{
+          http: {
+            path: 'fn2',
+            method: 'POST',
+          },
+        }],
+      }, (event, context, cb) => {
+        if (event.body === rawBody) {
+          const response = {
+            statusCode: 200,
+            body: JSON.stringify({
+              message: 'JSON body was not stripped of newlines or tabs',
+            }),
+          };
+
+          cb(null, response);
+        }
+        else {
+          cb('JSON body was mangled');
+        }
+      }).toObject();
+      done();
+    });
+
+    it('should return that the JSON was not mangled', done => {
+      const handler = {
+        method: 'POST',
+        url: '/fn2',
+        payload: rawBody,
+      };
+      offLine.inject(handler, res => {
+        expect(res.statusCode).to.eq(200);
+        expect(res.payload).to.eq(JSON.stringify({ message: 'JSON body was not stripped of newlines or tabs' }));
+        done();
+      });
+    });
+
+    it('should return that the JSON was not mangled with an application/json type', done => {
+      const handler = {
+        method: 'POST',
+        url: '/fn2',
+        payload: rawBody,
+        headers: {
+          'content-type': 'application/json',
+        },
+      };
+      offLine.inject(handler, res => {
+        expect(res.statusCode).to.eq(200);
+        expect(res.payload).to.eq(JSON.stringify({ message: 'JSON body was not stripped of newlines or tabs' }));
+        done();
+      });
+    });
+  });
+
+  context('aws runtime nodejs8.10', () => {
+    const serverless = { service: { provider: {
+      name: 'aws',
+      stage: 'dev',
+      region: 'us-east-1',
+      runtime: 'nodejs8.10',
+    } } };
+
+    it('should support handler returning Promise', done => {
+      const offLine = new OffLineBuilder(new ServerlessBuilder(serverless))
+        .addFunctionHTTP('index', {
+          path: 'index',
+          method: 'GET',
+        }, (event, context) => Promise.resolve({
+          statusCode: 200,
+          body: JSON.stringify({ message: 'Hello World' }),
+        })).toObject();
+
+      offLine.inject({
+        method: 'GET',
+        url: '/index',
+        payload: { data: 'input' },
+      }, res => {
+        expect(res.headers).to.have.property('content-type', 'application/json');
+        expect(res.statusCode).to.eq(200);
+        expect(res.payload).to.eq('{"message":"Hello World"}');
+        done();
+      });
+    });
+  });
 });

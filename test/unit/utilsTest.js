@@ -1,4 +1,4 @@
-/* global describe before context it */
+/* global describe context it */
 
 'use strict';
 
@@ -37,6 +37,29 @@ describe('utils', () => {
     context('with an empty object', () => {
       it('should return null', () => {
         expect(utils.nullIfEmpty({})).to.be.null();
+      });
+    });
+  });
+
+  describe('#detectEncoding', () => {
+    context('with application/json content-type', () => {
+      it('should return utf8', () => {
+        const request = {
+          headers: {
+            'content-type': 'application/json',
+          },
+        };
+        expect(utils.detectEncoding(request)).to.eq('utf8');
+      });
+    });
+    context('with multipart/form-data content-type', () => {
+      it('should return binary', () => {
+        const request = {
+          headers: {
+            'content-type': 'multipart/form-data',
+          },
+        };
+        expect(utils.detectEncoding(request)).to.eq('binary');
       });
     });
   });

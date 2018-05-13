@@ -22,6 +22,8 @@ const renderVelocityTemplateObject = require('./renderVelocityTemplateObject');
 const createAuthScheme = require('./createAuthScheme');
 const functionHelper = require('./functionHelper');
 const Endpoint = require('./Endpoint');
+const parseResources = require('./parseResources');
+const utils = require('./utils');
 
 /*
  I'm against monolithic code like this file, but splitting it induces unneeded complexity.
@@ -91,6 +93,9 @@ class Offline {
           noEnvironment: {
             usage: 'Turns off loading of your environment variables from serverless.yml. Allows the usage of tools such as PM2 or docker-compose.',
           },
+          resourceRoutes: {
+            usage: 'Turns on loading of your HTTP proxy settings from serverless.yml.',
+          },
           dontPrintOutput: {
             usage: 'Turns off logging of your lambda outputs in the terminal.',
           },
@@ -107,8 +112,17 @@ class Offline {
             usage: 'Defines the api key value to be used for endpoints marked as private. Defaults to a random hash.',
           },
           exec: {
-            usage: 'When provided, a shell script is executed when the server starts up, and the server will shut domn after handling this command.',
+            usage: 'When provided, a shell script is executed when the server starts up, and the server will shut down after handling this command.',
           },
+          noAuth: {
+            usage: 'Turns off all authorizers',
+          },
+          useSeparateProcesses: {
+            usage: 'Uses separate node processes for handlers',
+          },
+          preserveTrailingSlash: {
+            usage: 'Used to keep trailing slashes on the request path'
+          }
         },
       },
     };
@@ -189,6 +203,7 @@ class Offline {
     this._registerBabel();  // Support for ES6
     this._createServer();   // Hapijs boot
     this._createRoutes();   // API  Gateway emulation
+    this._createResourceRoutes(); // HTTP Proxy defined in Resource
     this._create404Route(); // Not found handling
 
     return this.server;
@@ -211,13 +226,17 @@ class Offline {
       region: this.service.provider.region,
       noTimeout: false,
       noEnvironment: false,
+      resourceRoutes: false,
       dontPrintOutput: false,
       httpsProtocol: '',
       skipCacheInvalidation: false,
+      noAuth: false,
       corsAllowOrigin: '*',
-      corsAllowHeaders: 'accept,content-type,x-api-key',
+      corsAllowHeaders: 'accept,content-type,x-api-key,authorization',
       corsAllowCredentials: true,
       apiKey: crypto.createHash('md5').digest('hex'),
+      useSeparateProcesses: false,
+      preserveTrailingSlash: false
     };
 
     this.options = _.merge({}, defaultOpts, (this.service.custom || {})['serverless-offline'], this.options);
@@ -271,10 +290,12 @@ class Offline {
     this.server = new Hapi.Server({
       connections: {
         router: {
-          stripTrailingSlash: true, // removes trailing slashes on incoming paths.
+          stripTrailingSlash: !this.options.preserveTrailingSlash, // removes trailing slashes on incoming paths.
         },
       },
     });
+
+    this.server.register(require('h2o2'), err => err && this.serverlessLog(err));
 
     const connectionOptions = {
       host: this.options.host,
@@ -303,7 +324,7 @@ class Offline {
     const apiKeys = this.service.provider.apiKeys;
     const protectedRoutes = [];
 
-    if (['nodejs', 'nodejs4.3', 'nodejs6.10', 'babel', 'python2.7', 'python3.6'].indexOf(serviceRuntime) === -1) {
+    if (['nodejs', 'nodejs4.3', 'nodejs6.10', 'nodejs8.10', 'babel'].indexOf(serviceRuntime) === -1) {
       this.printBlankLine();
       this.serverlessLog(`Warning: found unsupported runtime '${serviceRuntime}'`);
 
@@ -329,12 +350,8 @@ class Offline {
       this.serverlessLog(`Routes for ${funName}:`);
 
       // Adds a route for each http endpoint
-      fun.events && fun.events.forEach(event => {
-
-        if (!event.http) return;
-        if (_.eq(event.http.private, true)) {
-          protectedRoutes.push(`/${event.http.path}`);
-        }
+      (fun.events && fun.events.length || this.serverlessLog('(none)')) && fun.events.forEach(event => {
+        if (!event.http) return this.serverlessLog('(none)');
 
         // Handle Simple http setup, ex. - http: GET users/index
         if (typeof event.http === 'string') {
@@ -343,6 +360,10 @@ class Offline {
             path: split[1],
             method: split[0],
           };
+        }
+
+        if (_.eq(event.http.private, true)) {
+          protectedRoutes.push(`${event.http.method.toUpperCase()}#/${event.http.path}`);
         }
 
         // generate an enpoint via the endpoint class
@@ -363,7 +384,7 @@ class Offline {
         this.serverlessLog(`${method} ${fullPath}`);
 
         // If the endpoint has an authorization function, create an authStrategy for the route
-        let authStrategyName = this._configureAuthorization(endpoint, funName, method, epath, servicePath);
+        const authStrategyName = this.options.noAuth ? null : this._configureAuthorization(endpoint, funName, method, epath, servicePath);
 
         let cors = null;
         if (endpoint.cors) {
@@ -383,7 +404,9 @@ class Offline {
         };
 
         if (routeMethod !== 'HEAD' && routeMethod !== 'GET') {
-          routeConfig.payload = { parse: false };
+          // maxBytes: Increase request size from 1MB default limit to 10MB.
+          // Cf AWS API GW payload limits.
+          routeConfig.payload = { parse: false, maxBytes: 1024 * 1024 * 10 };
         }
 
         this.server.route({
@@ -391,8 +414,40 @@ class Offline {
           path: fullPath,
           config: routeConfig,
           handler: (request, reply) => { // Here we go
-            request.payload = request.payload && request.payload.toString();
+            // Payload processing
+            const encoding = utils.detectEncoding(request);
 
+            request.payload = request.payload && request.payload.toString(encoding);
+            request.rawPayload = request.payload;
+
+            // Headers processing
+            // Hapi lowercases the headers whereas AWS does not
+            // so we recreate a custom headers object from the raw request
+            const headersArray = request.raw.req.rawHeaders;
+
+            // During tests, `server.inject` uses *shot*, a package
+            // for performing injections that does not entirely mimick
+            // Hapi's usual request object. rawHeaders are then missing
+            // Hence the fallback for testing
+
+            // Normal usage
+            if (headersArray) {
+              const unprocessedHeaders = {};
+
+              for (let i = 0; i < headersArray.length; i += 2) {
+                unprocessedHeaders[headersArray[i]] = headersArray[i + 1];
+              }
+
+              request.unprocessedHeaders = unprocessedHeaders;
+            }
+            // Lib testing
+            else {
+              request.unprocessedHeaders = request.headers;
+              // console.log('request.unprocessedHeaders:', request.unprocessedHeaders);
+            }
+
+
+            // Incomming request message
             this.printBlankLine();
             this.serverlessLog(`${method} ${request.path} (λ: ${funName})`);
             if (firstCall) {
@@ -400,9 +455,9 @@ class Offline {
               firstCall = false;
             }
 
-            this.serverlessLog(protectedRoutes);
+            // this.serverlessLog(protectedRoutes);
             // Check for APIKey
-            if (_.includes(protectedRoutes, fullPath)) {
+            if (_.includes(protectedRoutes, `${routeMethod}#${fullPath}`) || _.includes(protectedRoutes, `ANY#${fullPath}`)) {
               const errorResponse = response => response({ message: 'Forbidden' }).code(403).type('application/json').header('x-amzn-ErrorType', 'ForbiddenException');
               if ('x-api-key' in request.headers) {
                 const requestToken = request.headers['x-api-key'];
@@ -452,7 +507,20 @@ class Offline {
             let handler; // The lambda function
 
             try {
-              process.env = _.extend({}, this.service.provider.environment, this.service.functions[key].environment, this.originalEnvironment);
+              if (this.options.noEnvironment) {
+                // This evict errors in server when we use aws services like ssm
+                const baseEnvironment = {
+                  AWS_ACCESS_KEY_ID: 'dev',
+                  AWS_SECRET_ACCESS_KEY: 'dev',
+                  AWS_REGION: 'dev'
+                }
+                process.env = _.extend({}, baseEnvironment);
+              }
+              else {
+                Object.assign(process.env, this.service.provider.environment, this.service.functions[key].environment);
+              }
+              Object.assign(process.env, this.originalEnvironment);
+              process.env._HANDLER = fun.handler;
               handler = functionHelper.createHandler(funOptions, this.options);
             }
             catch (err) {
@@ -516,6 +584,7 @@ class Offline {
               let result = data;
               let responseName = 'default';
               const responseContentType = endpoint.responseContentType;
+              const contentHandling = endpoint.contentHandling;
 
               /* RESPONSE SELECTION (among endpoint's possible responses) */
 
@@ -633,7 +702,7 @@ class Offline {
                     // BAD IMPLEMENTATION: first key in responseTemplates
                     const responseTemplate = responseTemplates[responseContentType];
 
-                    if (responseTemplate) {
+                    if (responseTemplate && responseTemplate !== '\n') {
 
                       debugLog('_____ RESPONSE TEMPLATE PROCCESSING _____');
                       debugLog(`Using responseTemplate '${responseContentType}'`);
@@ -663,7 +732,14 @@ class Offline {
                   override: false, // Maybe a responseParameter set it already. See #34
                 });
                 response.statusCode = statusCode;
-                response.source = result;
+                if (contentHandling === 'CONVERT_TO_BINARY') {
+                  response.encoding = 'binary';
+                  response.source = Buffer.from(result, 'base64');
+                  response.variety = 'buffer';
+                }
+                else {
+                  response.source = result;
+                }
               }
               else if (integration === 'lambda-proxy') {
                 response.statusCode = statusCode = result.statusCode || 200;
@@ -672,7 +748,14 @@ class Offline {
 
                 Object.assign(response.headers, defaultHeaders, result.headers);
                 if (!_.isUndefined(result.body)) {
-                  response.source = result.body;
+                  if (result.isBase64Encoded) {
+                    response.encoding = 'binary';
+                    response.source = Buffer.from(result.body, 'base64');
+                    response.variety = 'buffer';
+                  }
+                  else {
+                    response.source = result.body;
+                  }
                 }
               }
 
@@ -708,7 +791,7 @@ class Offline {
               const x = handler(event, lambdaContext, lambdaContext.done);
 
               // Promise support
-              if (serviceRuntime === 'babel' && !this.requests[requestId].done) {
+              if ((serviceRuntime === 'nodejs8.10' || serviceRuntime === 'babel') && !this.requests[requestId].done) {
                 if (x && typeof x.then === 'function' && typeof x.catch === 'function') x.then(lambdaContext.succeed).catch(lambdaContext.fail);
                 else if (x instanceof Error) lambdaContext.fail(x);
               }
@@ -751,9 +834,10 @@ class Offline {
 
       if (!authFunction) return this.serverlessLog(`WARNING: Authorization function ${authFunctionName} does not exist`);
 
-      let authorizerOptions = {};
-      authorizerOptions.resultTtlInSeconds = '300';
-      authorizerOptions.identitySource = 'method.request.header.Authorization';
+      const authorizerOptions = {
+        resultTtlInSeconds: '300',
+        identitySource: 'method.request.header.Authorization',
+      };
 
       if (typeof endpoint.authorizer === 'string') {
         authorizerOptions.name = authFunctionName;
@@ -778,13 +862,15 @@ class Offline {
         epath,
         this.options,
         this.serverlessLog,
-        servicePath
+        servicePath,
+        this.serverless
       );
 
       // Set the auth scheme and strategy on the server
       this.server.auth.scheme(authSchemeName, scheme);
       this.server.auth.strategy(authStrategyName, authSchemeName);
     }
+
     return authStrategyName;
   }
 
@@ -818,7 +904,12 @@ class Offline {
     const stackTrace = this._getArrayStackTrace(err.stack);
 
     this.serverlessLog(message);
-    console.log(stackTrace || err);
+    if (stackTrace && stackTrace.length > 0) {
+      console.log(stackTrace);
+    }
+    else {
+      console.log(err);
+    }
 
     /* eslint-disable no-param-reassign */
     response.statusCode = 200; // APIG replies 200 by default on failures
@@ -850,6 +941,68 @@ class Offline {
     const timeout = this.requests[requestId].timeout;
     if (timeout && timeout._called) return true;
     clearTimeout(timeout);
+  }
+
+  _createResourceRoutes() {
+    if (!this.options.resourceRoutes) return true;
+    const resourceRoutesOptions = this.options.resourceRoutes;
+    const resourceRoutes = parseResources(this.service.resources);
+
+    if (_.isEmpty(resourceRoutes)) return true;
+
+    this.printBlankLine();
+    this.serverlessLog('Routes defined in resources:');
+
+    Object.keys(resourceRoutes).forEach(methodId => {
+      const resourceRoutesObj = resourceRoutes[methodId];
+      const path = resourceRoutesObj.path;
+      const method = resourceRoutesObj.method;
+      const isProxy = resourceRoutesObj.isProxy;
+      const proxyUri = resourceRoutesObj.proxyUri;
+      const pathResource = resourceRoutesObj.pathResource;
+
+      if (!isProxy) {
+        return this.serverlessLog(`WARNING: Only HTTP_PROXY is supported. Path '${pathResource}' is ignored.`);
+      }
+      if (!path) {
+        return this.serverlessLog(`WARNING: Could not resolve path for '${methodId}'.`);
+      }
+
+      let fullPath = this.options.prefix + (pathResource.startsWith('/') ? pathResource.slice(1) : pathResource);
+      if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = fullPath.slice(0, -1);
+      fullPath = fullPath.replace(/\+}/g, '*}');
+
+      const proxyUriOverwrite = resourceRoutesOptions[methodId] || {};
+      const proxyUriInUse = proxyUriOverwrite.Uri || proxyUri;
+
+      if (!proxyUriInUse) {
+        return this.serverlessLog(`WARNING: Could not load Proxy Uri for '${methodId}'`);
+      }
+      const routeMethod = method === 'ANY' ? '*' : method;
+      const routeConfig = {
+        cors: this.options.corsConfig
+      }
+      if (routeMethod !== 'HEAD' && routeMethod !== 'GET') {
+        routeConfig.payload = { parse: false };
+      }
+
+      this.serverlessLog(`${method} ${fullPath} -> ${proxyUriInUse}`);
+      this.server.route({
+        method: routeMethod,
+        path: fullPath,
+        config: routeConfig,
+        handler: (request, reply) => {
+          const params = request.params;
+          let resultUri = proxyUriInUse;
+
+          Object.keys(params).forEach(key => {
+            resultUri = resultUri.replace(`{${key}}`, params[key]);
+          });
+          this.serverlessLog(`PROXY ${request.method} ${request.url.path} -> ${resultUri}`);
+          reply.proxy({ uri: resultUri, passThrough: true });
+        },
+      });
+    });
   }
 
   _create404Route() {
@@ -888,5 +1041,9 @@ class Offline {
     process.exit(0);
   }
 }
+
+// Serverless exits with code 1 when a promise rejection is unhandled. Not AWS.
+// Users can still use their own unhandledRejection event though.
+process.removeAllListeners('unhandledRejection');
 
 module.exports = Offline;
