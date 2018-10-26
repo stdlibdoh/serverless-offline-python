@@ -13,7 +13,7 @@ const messageCallbacks = {};
 function runPythonHandler(funOptions, options) {
     var spawn = require("child_process").spawn;
     return function (event, context) {
-        var process = spawn('sls', ["invoke", "local", "-f", funOptions.funName],
+        var process = spawn('sls', ["invoke", "local", "-f", funOptions.funName, "-s", options.s],
             { stdio: ['pipe', 'pipe', 'pipe'], shell: true, cwd: funOptions.servicePath });
         process.stdin.write(JSON.stringify(event) + "\n");
         process.stdin.end();
