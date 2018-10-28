@@ -13,7 +13,12 @@ const messageCallbacks = {};
 function runPythonHandler(funOptions, options) {
     var spawn = require("child_process").spawn;
     return function (event, context) {
-        var process = spawn('sls', ["invoke", "local", "-f", funOptions.funName, "-s", options.s],
+        var args = ["invoke", "local", "-f", funOptions.funName]
+        var stage = options.s || options.stage
+        if (stage)
+            args = args.concat(["-s", stage])
+
+        var process = spawn('sls', args,
             { stdio: ['pipe', 'pipe', 'pipe'], shell: true, cwd: funOptions.servicePath });
         process.stdin.write(JSON.stringify(event) + "\n");
         process.stdin.end();
@@ -64,21 +69,21 @@ function runPythonHandler(funOptions, options) {
 
 module.exports = {
   getFunctionOptions(fun, funName, servicePath, serviceRuntime) {
-        console.log(fun, funName, servicePath)
-        // Split handler into method name and path i.e. handler.run
-        const handlerFile = fun.handler.split('.')[0];
-        const handlerName = fun.handler.split('/').pop().split('.')[1];
+      console.log(fun, funName, servicePath)
+      // Split handler into method name and path i.e. handler.run
+      const handlerFile = fun.handler.split('.')[0];
+      const handlerName = fun.handler.split('/').pop().split('.')[1];
 
-        return {
-            funName,
-            handlerName, // i.e. run
-            handlerFile,
-            handlerPath: `${servicePath}/${handlerFile}`,
-            servicePath,
-            funTimeout: (fun.timeout || 30) * 1000,
-            babelOptions: ((fun.custom || {}).runtime || {}).babel,
-            serviceRuntime,
-        };
+      return {
+          funName,
+          handlerName, // i.e. run
+          handlerFile,
+          handlerPath: `${servicePath}/${handlerFile}`,
+          servicePath,
+          funTimeout: (fun.timeout || 30) * 1000,
+          babelOptions: ((fun.custom || {}).runtime || {}).babel,
+          serviceRuntime,
+      };
     },
 
   createExternalHandler(funOptions, options) {
