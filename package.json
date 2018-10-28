@@ -1,6 +1,6 @@
 {
   "name": "serverless-offline-python",
-  "version": "3.21.1",
+  "version": "3.21.3",
   "description": "Emulate AWS λ and API Gateway locally when developing your Serverless project",
   "main": "src/index.js",
   "scripts": {
@@ -14,6 +14,7 @@
   "keywords": [
     "Serverless",
     "Amazon Web Services",
+    "Python",
     "AWS",
     "Lambda",
     "API Gateway"
@@ -23,7 +24,8 @@
     "Bilal Soylu (https://github.com/Bilal-S)",
     "Leonardo Alifraco (https://github.com/leonardoalifraco)",
     "Michael Staub (https://github.com/mikestaub)",
-    "Daniel Cottone <daniel.cottone@gmail.com> (https://github.com/daniel-cottone)"
+    "Daniel Cottone <daniel.cottone@gmail.com> (https://github.com/daniel-cottone)",
+    "Abdullah Alhazmy <me@alhazmy13.net> (https://github.com/alhazmy13)"
   ],
   "contributors": [
     "Adam Sweeting (https://github.com/adamelliottsweeting)",
@@ -92,13 +94,14 @@
     "Utku Turunc (https://github.com/utkuturunc)",
     "Vasiliy Solovey (https://github.com/miltador)",
     "Daniel Cottone <daniel.cottone@gmail.com> (https://github.com/daniel-cottone)",
+    "Abdullah Alhazmy <me@alhazmy13.net> (https://github.com/alhazmy13)",
     "Jaryd Carolin (https://github.com/horyd)"
   ],
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/dherault/serverless-offline/issues"
+    "url": "https://github.com/alhazmy13/serverless-offline-python/issues"
   },
-  "homepage": "https://github.com/dherault/serverless-offline",
+  "homepage": "https://github.com/alhazmy13/serverless-offline-python",
   "dependencies": {
     "babel-register": "^6.18.0",
     "boom": "^4.2.0",
