@@ -384,7 +384,7 @@ class Offline {
         this.serverlessLog(`${method} ${fullPath}`);
 
         // If the endpoint has an authorization function, create an authStrategy for the route
-        const authStrategyName = this.options.noAuth ? null : this._configureAuthorization(endpoint, funName, method, epath, servicePath);
+        const authStrategyName = this.options.noAuth ? null : this._configureAuthorization(endpoint, funName, method, epath, servicePath, serviceRuntime);
 
         let cors = null;
         if (endpoint.cors) {
@@ -805,7 +805,7 @@ class Offline {
     });
   }
 
-  _configureAuthorization(endpoint, funName, method, epath, servicePath) {
+  _configureAuthorization(endpoint, funName, method, epath, servicePath, serviceRuntime) {
     let authStrategyName = null;
     if (endpoint.authorizer) {
       let authFunctionName = endpoint.authorizer;
@@ -863,7 +863,8 @@ class Offline {
         this.options,
         this.serverlessLog,
         servicePath,
-        this.serverless
+        this.serverless,
+        serviceRuntime
       );
 
       // Set the auth scheme and strategy on the server

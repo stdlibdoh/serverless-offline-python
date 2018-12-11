@@ -6,6 +6,7 @@ const fork = require('child_process').fork;
 const _ = require('lodash');
 const path = require('path');
 const uuid = require('uuid/v4');
+const utils = require('./utils');
 
 const handlerCache = {};
 const messageCallbacks = {};
@@ -33,7 +34,7 @@ function runPythonHandler(funOptions, options) {
             } else {
                 // Search for the start of the JSON result
                 // https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format
-                const match = /{[\r\n]\s+"isBase64Encoded"|{[\r\n]\s+"statusCode"|{[\r\n]\s+"headers"|{[\r\n]\s+"body"/.exec(str);
+                const match = /{[\r\n]\s+"isBase64Encoded"|{[\r\n]\s+"statusCode"|{[\r\n]\s+"headers"|{[\r\n]\s+"body"|{[\r\n]\s+"principalId"/.exec(str);
                 if (match && match.index > -1) {
                     // The JSON result was in this chunk so slice it out
                     hasDetectedJson = true;
@@ -160,7 +161,7 @@ module.exports = {
     }
     let user_python = true
     let handler = null;
-    if (['python2.7', 'python3.6'].indexOf(funOptions['serviceRuntime']) !== -1){
+    if (utils.isPythonRuntime(funOptions['serviceRuntime'])) {
       handler = runPythonHandler(funOptions, options)
     } else {
       debugLog(`Loading handler... (${funOptions.handlerPath})`);
