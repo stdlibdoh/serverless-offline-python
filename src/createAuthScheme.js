@@ -9,7 +9,7 @@ const utils = require('./utils');
 const _ = require('lodash');
 const authCanExecuteResource = require('./authCanExecuteResource');
 
-module.exports = function createAuthScheme(authFun, authorizerOptions, funName, endpointPath, options, serverlessLog, servicePath, serverless) {
+module.exports = function createAuthScheme(authFun, authorizerOptions, funName, endpointPath, options, serverlessLog, servicePath, serverless, serviceRuntime) {
   const authFunName = authorizerOptions.name;
 
   let identityHeader = 'authorization';
@@ -21,8 +21,10 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
     }
     identityHeader = identitySourceMatch[1].toLowerCase();
   }
-  
-  const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
+
+  // HACK: since handlerName is used to invoke python function locally,
+  // we have to pass the authFunName instead of funcName
+  const funOptions = functionHelper.getFunctionOptions(authFun, utils.isPythonRuntime(serviceRuntime) ? authFunName : funName, servicePath, serviceRuntime);
 
   // Create Auth Scheme
   return () => ({
