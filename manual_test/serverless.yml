@@ -14,11 +14,13 @@
 service: basic
 
 plugins:
-  - serverless-offline
+  - serverless-offline-python
 
 provider:
   name: aws
   runtime: nodejs4.3
+  # runtime: ruby2.5
+  # runtime: python2.7
   apiKeys:
     - token
 # you can overwrite defaults here

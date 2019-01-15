@@ -22,9 +22,9 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
     identityHeader = identitySourceMatch[1].toLowerCase();
   }
 
-  // HACK: since handlerName is used to invoke python function locally,
+  // HACK: since handlerName is used to invoke python/ruby (ie. a proxy runtime) function locally,
   // we have to pass the authFunName instead of funcName
-  const funOptions = functionHelper.getFunctionOptions(authFun, utils.isPythonRuntime(serviceRuntime) ? authFunName : funName, servicePath, serviceRuntime);
+  const funOptions = functionHelper.getFunctionOptions(authFun, utils.isProxyRuntime(serviceRuntime) ? authFunName : funName, servicePath, serviceRuntime);
 
   // Create Auth Scheme
   return () => ({
