@@ -1,7 +1,7 @@
-# Serverless Offline Python Plugin
+# Serverless Offline Python/Ruby Plugin
 
 [![serverless](http://public.serverless.com/badges/v3.svg)](http://www.serverless.com)
-[![npm version](https://badge.fury.io/js/serverless-offline.svg)](https://badge.fury.io/js/serverless-offline)
+[![npm version](https://badge.fury.io/js/serverless-offline-python.svg)](https://badge.fury.io/js/serverless-offline-python)
 [![Build Status](https://travis-ci.org/dherault/serverless-offline-python.svg?branch=master)](https://travis-ci.org/dherault/serverless-offline)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
@@ -10,7 +10,7 @@ To do so, it starts an HTTP server that handles the request's lifecycle like API
 
 **Features:**
 
-* Nodejs λ, Python 2.7, and Python 3.6 only.
+* Nodejs λ, Python 2.7, Python 3.6, and Ruby only.
 * Velocity templates support.
 * Lazy loading of your files with require cache invalidation: no need for a reloading tool like Nodemon.
 * And more: integrations, authorizers, proxies, timeouts, responseParameters, HTTPS, Babel runtime, CORS, etc...
