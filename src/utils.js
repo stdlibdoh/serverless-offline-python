@@ -17,5 +17,16 @@ module.exports = {
   // Detect the toString encoding from the request headers content-type
   // enhance if further content types need to be non utf8 encoded.
   detectEncoding: request => _.includes(request.headers['content-type'], 'multipart/form-data') ? 'binary' : 'utf8',
-  isProxyRuntime: runtime => { return runtime.startsWith('python') || runtime.startsWith('ruby') }
+  isProxyRuntime: runtime => { return runtime.startsWith('python') || runtime.startsWith('ruby') },
+  supportedRuntimes: [
+    'nodejs',
+    'nodejs4.3',
+    'nodejs6.10',
+    'nodejs8.10',
+    'babel',
+    'python2.7',
+    'python3.6',
+    'python3.7',
+    'ruby2.5',
+  ],
 };
