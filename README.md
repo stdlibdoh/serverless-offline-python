@@ -10,7 +10,7 @@ To do so, it starts an HTTP server that handles the request's lifecycle like API
 
 **Features:**
 
-* Nodejs λ, Python 2.7, Python 3.6, and Ruby only.
+* Nodejs λ, Python 2.7, Python 3.6, Python 3.7, and Ruby only.
 * Velocity templates support.
 * Lazy loading of your files with require cache invalidation: no need for a reloading tool like Nodemon.
 * And more: integrations, authorizers, proxies, timeouts, responseParameters, HTTPS, Babel runtime, CORS, etc...
