@@ -6,7 +6,7 @@ const path = require('path');
 const exec = require('child_process').exec;
 
 // External dependencies
-const Hapi = require('hapi');
+const Hapi = require('@hapi/hapi');
 const corsHeaders = require('hapi-cors-headers');
 const _ = require('lodash');
 const crypto = require('crypto');
@@ -121,8 +121,8 @@ class Offline {
             usage: 'Uses separate node processes for handlers',
           },
           preserveTrailingSlash: {
-            usage: 'Used to keep trailing slashes on the request path'
-          }
+            usage: 'Used to keep trailing slashes on the request path',
+          },
         },
       },
     };
@@ -236,7 +236,7 @@ class Offline {
       corsAllowCredentials: true,
       apiKey: crypto.createHash('md5').digest('hex'),
       useSeparateProcesses: false,
-      preserveTrailingSlash: false
+      preserveTrailingSlash: false,
     };
 
     this.options = _.merge({}, defaultOpts, (this.service.custom || {})['serverless-offline'], this.options);
@@ -343,7 +343,7 @@ class Offline {
       const fun = this.service.getFunction(key);
       const funName = key;
       const servicePath = path.join(this.serverless.config.servicePath, this.options.location);
-      const funOptions = functionHelper.getFunctionOptions(fun, key, servicePath,serviceRuntime);
+      const funOptions = functionHelper.getFunctionOptions(fun, key, servicePath, serviceRuntime);
       debugLog(`funOptions ${JSON.stringify(funOptions, null, 2)} `);
 
       this.printBlankLine();
@@ -513,8 +513,8 @@ class Offline {
                 const baseEnvironment = {
                   AWS_ACCESS_KEY_ID: 'dev',
                   AWS_SECRET_ACCESS_KEY: 'dev',
-                  AWS_REGION: 'dev'
-                }
+                  AWS_REGION: 'dev',
+                };
                 process.env = _.extend({}, baseEnvironment);
               }
               else {
@@ -982,8 +982,8 @@ class Offline {
       }
       const routeMethod = method === 'ANY' ? '*' : method;
       const routeConfig = {
-        cors: this.options.corsConfig
-      }
+        cors: this.options.corsConfig,
+      };
       if (routeMethod !== 'HEAD' && routeMethod !== 'GET') {
         routeConfig.payload = { parse: false };
       }

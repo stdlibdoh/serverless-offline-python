@@ -12,80 +12,83 @@ const handlerCache = {};
 const messageCallbacks = {};
 
 function runProxyHandler(funOptions, options) {
-  var spawn = require("child_process").spawn;
+  const spawn = require('child_process').spawn;
+  
   return function (event, context) {
-      var args = ["invoke", "local", "-f", funOptions.funName]
-      var stage = options.s || options.stage
-      if (stage)
-          args = args.concat(["-s", stage])
+    let args = ['invoke', 'local', '-f', funOptions.funName];
+    const stage = options.s || options.stage;
+    if (stage) { args = args.concat(['-s', stage]); }
 
-      var process = spawn('sls', args,
+    const process = spawn('sls', args,
           { stdio: ['pipe', 'pipe', 'pipe'], shell: true, cwd: funOptions.servicePath });
-      process.stdin.write(JSON.stringify(event) + "\n");
-      process.stdin.end();
-      let results = ''
-      let hasDetectedJson = false;
-      process.stdout.on('data', (data) => {
-          let str = data.toString('utf8');
-          if (hasDetectedJson) {
+    process.stdin.write(`${JSON.stringify(event)}\n`);
+    process.stdin.end();
+    let results = '';
+    let hasDetectedJson = false;
+    process.stdout.on('data', data => {
+      let str = data.toString('utf8');
+      if (hasDetectedJson) {
               // Assumes that all data after matching the start of the
               // JSON result is the rest of the context result.
-              results = results + trimNewlines(str);
-          } else {
+        results += trimNewlines(str);
+      }
+      else {
               // Search for the start of the JSON result
               // https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-output-format
-              const match = /{[\r\n]?\s*"isBase64Encoded"|{[\r\n]?\s*"statusCode"|{[\r\n]?\s*"headers"|{[\r\n]?\s*"body"|{[\r\n]?\s*"principalId"/.exec(str);
-              if (match && match.index > -1) {
+        const match = /{[\r\n]?\s*"isBase64Encoded"|{[\r\n]?\s*"statusCode"|{[\r\n]?\s*"headers"|{[\r\n]?\s*"body"|{[\r\n]?\s*"principalId"/.exec(str);
+        if (match && match.index > -1) {
                   // The JSON result was in this chunk so slice it out
-                  hasDetectedJson = true;
-                  results = results + trimNewlines(str.slice(match.index));
-                  str = str.slice(0, match.index);
-              }
+          hasDetectedJson = true;
+          results += trimNewlines(str.slice(match.index));
+          str = str.slice(0, match.index);
+        }
 
-              if(str.length > 0) {
+        if (str.length > 0) {
                   // The data does not look like JSON and we have not
                   // detected the start of JSON, so write the
                   // output to the console instead.
-                  console.log('Proxy Handler could not detect JSON:', '\x1b[34m' + str + '\x1b[0m');
-              }
-          }
-      });
-      process.stderr.on('data', (data) => {
-          context.fail(data);
-      });
-      process.on('close', (code) => {
-          if (code == 0) {
-              try {
-                  context.succeed(JSON.parse(results));
-              } catch (ex) {
-                  context.fail(results);
-              }
-          } else {
-              context.succeed(code, results);
-          }
-      });
-  }
+          console.log('Proxy Handler could not detect JSON:', `\x1b[34m${str}\x1b[0m`);
+        }
+      }
+    });
+    process.stderr.on('data', data => {
+      context.fail(data);
+    });
+    process.on('close', code => {
+      if (code === 0) {
+        try {
+          context.succeed(JSON.parse(results));
+        }
+        catch (ex) {
+          context.fail(results);
+        }
+      }
+      else {
+        context.succeed(code, results);
+      }
+    });
+  };
 }
 
 
 module.exports = {
   getFunctionOptions(fun, funName, servicePath, serviceRuntime) {
-      console.log(fun, funName, servicePath)
+    console.log(fun, funName, servicePath);
       // Split handler into method name and path i.e. handler.run
-      const handlerFile = fun.handler.split('.')[0];
-      const handlerName = fun.handler.split('/').pop().split('.')[1];
+    const handlerFile = fun.handler.split('.')[0];
+    const handlerName = fun.handler.split('/').pop().split('.')[1];
 
-      return {
-          funName,
-          handlerName, // i.e. run
-          handlerFile,
-          handlerPath: `${servicePath}/${handlerFile}`,
-          servicePath,
-          funTimeout: (fun.timeout || 30) * 1000,
-          babelOptions: ((fun.custom || {}).runtime || {}).babel,
-          serviceRuntime,
-      };
-    },
+    return {
+      funName,
+      handlerName, // i.e. run
+      handlerFile,
+      handlerPath: `${servicePath}/${handlerFile}`,
+      servicePath,
+      funTimeout: (fun.timeout || 30) * 1000,
+      babelOptions: ((fun.custom || {}).runtime || {}).babel,
+      serviceRuntime,
+    };
+  },
 
   createExternalHandler(funOptions, options) {
     let handlerContext = handlerCache[funOptions.handlerPath];
@@ -161,9 +164,10 @@ module.exports = {
     }
 
     let handler = null;
-    if (utils.isProxyRuntime(funOptions['serviceRuntime'])) {
-      handler = runProxyHandler(funOptions, options)
-    } else {
+    if (utils.isProxyRuntime(funOptions.serviceRuntime)) {
+      handler = runProxyHandler(funOptions, options);
+    }
+    else {
       debugLog(`Loading handler... (${funOptions.handlerPath})`);
       handler = require(funOptions.handlerPath)[funOptions.handlerName];
     }

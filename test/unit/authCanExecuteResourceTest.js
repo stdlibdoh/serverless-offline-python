@@ -72,7 +72,7 @@ describe('authCanExecuteResource', () => {
   context('when the policy has multiple Statements', () => {
     const setup = statements => (
       {
-        Statement: statements.map((statement) => (
+        Statement: statements.map(statement => (
           {
             Effect: statement.Effect,
             Resource: statement.Resource,
