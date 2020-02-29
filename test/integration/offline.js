@@ -23,7 +23,7 @@ describe('Offline', () => {
       offline.inject({
         method: 'GET',
         url: '/magic',
-      }, res => {
+      }).then(res => {
         expect(res.statusCode).to.eq(404);
       });
     });
@@ -59,7 +59,7 @@ describe('Offline', () => {
       offLine.inject({
         method: 'GET',
         url: '/fn2',
-      }, res => {
+      }).then(res => {
         expect(res.statusCode).to.eq(403);
         expect(res.payload).to.eq(JSON.stringify({ message: 'Forbidden' }));
         expect(res.headers).to.have.property('x-amzn-errortype', 'ForbiddenException');
@@ -72,7 +72,7 @@ describe('Offline', () => {
         method: 'GET',
         url: '/fn2',
         headers: { 'x-api-key': 'random string' },
-      }, res => {
+      }).then(res => {
         expect(res.statusCode).to.eq(403);
         expect(res.payload).to.eq(JSON.stringify({ message: 'Forbidden' }));
         expect(res.headers).to.have.property('x-amzn-errortype', 'ForbiddenException');
@@ -86,7 +86,7 @@ describe('Offline', () => {
         url: '/fn2',
         headers: { 'x-api-key': validToken },
       };
-      offLine.inject(handler, res => {
+      offLine.inject(handler).then(res => {
         expect(res.statusCode).to.eq(200);
         expect(res.payload).to.eq(JSON.stringify({ message: 'Private Function Executed Correctly' }));
         done();
@@ -114,7 +114,7 @@ describe('Offline', () => {
         }],
       }, (event, context, cb) => cb(null, 'Hello World')).toObject();
 
-      offLine.inject('/index', res => {
+      offLine.inject('/index').then(res => {
         expect(res.headers['content-type']).to.contains('text/html');
         expect(res.statusCode).to.satisfy(status => status === 200 || status === '200');
         done();
@@ -140,7 +140,7 @@ describe('Offline', () => {
           }],
         }, (event, context, cb) => cb(new Error('Internal Server Error'))).toObject();
 
-        offLine.inject('/index', res => {
+        offLine.inject('/index').then(res => {
           expect(res.headers['content-type']).to.contains('text/html');
           expect(res.statusCode).to.satisfy(status => status === 500 || status === '500');
           done();
@@ -165,7 +165,7 @@ describe('Offline', () => {
           }],
         }, (event, context, cb) => cb(new Error('[401] Unauthorized'))).toObject();
 
-        offLine.inject('/index', res => {
+        offLine.inject('/index').then(res => {
           expect(res.headers['content-type']).to.contains('text/html');
           expect(res.statusCode).to.satisfy(status => status === 401 || status === '401');
           done();
@@ -189,7 +189,7 @@ describe('Offline', () => {
         method: 'GET',
         url: '/fn1',
         payload: { data: 'data' },
-      }, res => {
+      }).then(res => {
         expect(res.headers).to.have.property('content-type', 'application/json');
         done();
       });
@@ -215,7 +215,7 @@ describe('Offline', () => {
           'content-type': 'application/json',
         },
         payload: { data: 'data' },
-      }, res => {
+      }).then(res => {
         expect(res.headers).to.have.property('content-type', 'application/json; charset=utf-8');
         done();
       });
@@ -241,7 +241,7 @@ describe('Offline', () => {
           'content-type': 'application/vnd.api+json',
         },
         payload: { data: 'data' },
-      }, res => {
+      }).then(res => {
         // console.log(res);
         expect(res.headers).to.have.property('content-type', 'application/vnd.api+json');
         done();
@@ -261,7 +261,7 @@ describe('Offline', () => {
       offLine.inject({
         method: 'GET',
         url: '/fn1',
-      }, res => {
+      }).then(res => {
         expect(res.headers).to.have.property('content-type', 'application/json');
         done();
       });
@@ -279,7 +279,7 @@ describe('Offline', () => {
       offLine.inject({
         method: 'GET',
         url: '/fn3',
-      }, res => {
+      }).then(res => {
         expect(res.statusCode).to.eq(201);
         done();
       });
@@ -297,7 +297,7 @@ describe('Offline', () => {
       offLine.inject({
         method: 'GET',
         url: '/fn1',
-      }, res => {
+      }).then(res => {
         expect(res.statusCode).to.eq(201);
         done();
       });
@@ -316,7 +316,7 @@ describe('Offline', () => {
         offLine.inject({
           method: 'GET',
           url: '/fn1',
-        }, res => {
+        }).then(res => {
           expect(res.payload).to.eq('Hello World');
           done();
         });
@@ -333,7 +333,7 @@ describe('Offline', () => {
         statusCode: 200, body: 'Hello',
       })).toObject();
 
-      offLine.inject('/test/some/matching/route', res => {
+      offLine.inject('/test/some/matching/route').then(res => {
         expect(res.statusCode).to.eq(200);
         expect(res.payload).to.eq('Hello');
         done();
@@ -397,7 +397,7 @@ describe('Offline', () => {
         url: '/fn2',
         payload: rawBody,
       };
-      offLine.inject(handler, res => {
+      offLine.inject(handler).then(res => {
         expect(res.statusCode).to.eq(200);
         expect(res.payload).to.eq(JSON.stringify({ message: 'JSON body was not stripped of newlines or tabs' }));
         done();
@@ -413,7 +413,7 @@ describe('Offline', () => {
           'content-type': 'application/json',
         },
       };
-      offLine.inject(handler, res => {
+      offLine.inject(handler).then(res => {
         expect(res.statusCode).to.eq(200);
         expect(res.payload).to.eq(JSON.stringify({ message: 'JSON body was not stripped of newlines or tabs' }));
         done();
@@ -443,7 +443,7 @@ describe('Offline', () => {
         method: 'GET',
         url: '/index',
         payload: { data: 'input' },
-      }, res => {
+      }).then(res => {
         expect(res.headers).to.have.property('content-type', 'application/json');
         expect(res.statusCode).to.eq(200);
         expect(res.payload).to.eq('{"message":"Hello World"}');
