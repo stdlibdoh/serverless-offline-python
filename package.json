@@ -106,8 +106,8 @@
   "dependencies": {
     "@hapi/hapi": "^19.1.1",
     "babel-register": "^6.18.0",
-    "boom": "^4.2.0",
-    "h2o2": "^5.4.0",
+    "@hapi/boom": "^9.0.0",
+    "@hapi/h2o2": "^8.2.0",
     "hapi-cors-headers": "^1.0.3",
     "js-string-escape": "^1.0.1",
     "jsonpath-plus": "^0.16.0",
