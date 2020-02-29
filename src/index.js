@@ -7,7 +7,6 @@ const exec = require('child_process').exec;
 
 // External dependencies
 const Hapi = require('@hapi/hapi');
-const corsHeaders = require('hapi-cors-headers');
 const _ = require('lodash');
 const crypto = require('crypto');
 
@@ -307,10 +306,33 @@ class Offline {
     // Hapijs server creation
     this.server = Hapi.server(connectionOptions);
 
-    this.server.register(require('h2o2'), err => err && this.serverlessLog(err));
+    this.server.register(require('@hapi/h2o2'), err => err && this.serverlessLog(err));
 
     // Enable CORS preflight response
-    this.server.ext('onPreResponse', corsHeaders);
+    this.server.ext('onPreResponse', (request, h) => {
+      if (request.headers.origin) {
+        const response = request.response.isBoom ? request.response.output : request.response;
+
+        response.headers['access-control-allow-origin'] = request.headers.origin;
+        response.headers['access-control-allow-credentials'] = 'true';
+
+        if (request.method === 'options') {
+          response.statusCode = 200;
+          response.headers['access-control-expose-headers'] = 'content-type, content-length, etag';
+          response.headers['access-control-max-age'] = 60 * 10;
+
+          if (request.headers['access-control-request-headers']) {
+            response.headers['access-control-allow-headers'] = request.headers['access-control-request-headers'];
+          }
+
+          if (request.headers['access-control-request-method']) {
+            response.headers['access-control-allow-methods'] = request.headers['access-control-request-method'];
+          }
+        }
+      }
+
+      return h.continue;
+    });
   }
 
   _createRoutes() {
@@ -475,7 +497,7 @@ class Offline {
             this.currentRequestId = requestId;
 
             // Holds the response to do async op
-            const response = reply.response().hold();
+            const response = reply.response();
             const contentType = request.mime || defaultContentType;
 
             // default request template to '' if we don't have a definition pushed in from serverless or endpoint
